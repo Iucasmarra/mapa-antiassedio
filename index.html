@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mapa Antiassédio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0D2137;--navy-mid:#133052;--navy-lt:#1C4A70;
+  --pink:#E8628A;--pink-s:#F2A7BE;--pink-bg:#FCE8EF;
+  --white:#FFF;--off:#F4F6F9;--gray:#64748B;--gray-lt:#CBD5E1;
+  --dark:#1E293B;--green:#16A34A;--amber:#D97706;--red:#DC2626;
+  --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--navy);font-family:'Inter',sans-serif;color:var(--dark);overflow:hidden}
+button{font-family:'Inter',sans-serif;cursor:pointer;border:none;background:none}
+input,textarea{font-family:'Inter',sans-serif}
+input:focus,textarea:focus{outline:none}
+
+/* ── Shell ── */
+#app{display:flex;flex-direction:column;height:100%;padding-top:var(--safe-top)}
+#topbar{background:var(--navy);padding:10px 18px 8px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(232,98,138,.15)}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-text{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--white);letter-spacing:-.3px}
+.logo-text em{color:var(--pink);font-style:normal}
+.sos-btn{background:var(--red);color:#fff;font-weight:700;font-size:12px;border-radius:20px;padding:6px 14px;display:flex;align-items:center;gap:6px;animation:pulse-sos 2.5s infinite}
+@keyframes pulse-sos{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.5)}50%{box-shadow:0 0 0 7px rgba(220,38,38,0)}}
+
+#screens{flex:1;overflow:hidden;position:relative;background:var(--off)}
+.screen{position:absolute;inset:0;overflow-y:auto;transition:opacity .22s,transform .22s;opacity:0;pointer-events:none;transform:translateX(16px)}
+.screen.active{opacity:1;pointer-events:all;transform:translateX(0)}
+
+/* ── Navbar ── */
+#navbar{background:var(--navy);display:flex;border-top:1px solid rgba(232,98,138,.12);padding-bottom:var(--safe-bot);flex-shrink:0}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 7px;color:#5B7FA6;font-size:10px;transition:color .18s}
+.nav-item svg{width:22px;height:22px}
+.nav-item.active{color:var(--pink)}
+.nav-dot{width:4px;height:4px;border-radius:50%;background:var(--pink);opacity:0;transition:opacity .18s}
+.nav-item.active .nav-dot{opacity:1}
+
+/* ── Map ── */
+#map-screen{background:#0A1929}
+.map-wrap{width:100%;height:calc(100% - 145px);position:relative;overflow:hidden}
+.map-bg{width:100%;height:100%;background:#0F2744;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:44px 44px;position:relative;cursor:grab;transition:background-position .3s}
+.map-bg:active{cursor:grabbing}
+.street{position:absolute;background:rgba(255,255,255,.07)}
+.street.h{height:3px;left:0;right:0}
+.street.v{width:3px;top:0;bottom:0}
+.heat{position:absolute;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;transition:opacity .5s}
+.heat-hi{background:radial-gradient(circle,rgba(220,38,38,.7) 0%,rgba(220,38,38,.22) 50%,transparent 70%)}
+.heat-md{background:radial-gradient(circle,rgba(251,146,60,.6) 0%,rgba(251,146,60,.18) 50%,transparent 70%)}
+.heat-lo{background:radial-gradient(circle,rgba(234,179,8,.5) 0%,rgba(234,179,8,.12) 50%,transparent 70%)}
+.pin-you{position:absolute;transform:translate(-50%,-50%)}
+.pin-you-dot{width:14px;height:14px;background:#60A5FA;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px rgba(96,165,250,.25)}
+.map-filters{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:7px;overflow-x:auto;scrollbar-width:none}
+.map-filters::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;background:rgba(13,33,55,.88);border:1px solid rgba(232,98,138,.3);color:#fff;font-size:11px;padding:5px 12px;border-radius:20px;cursor:pointer;backdrop-filter:blur(6px);transition:background .15s,border-color .15s;white-space:nowrap}
+.chip.on{background:var(--pink);border-color:var(--pink)}
+.map-info{position:absolute;bottom:0;left:0;right:0;background:var(--navy);border-radius:20px 20px 0 0;padding:14px 18px 16px;border-top:1px solid rgba(232,98,138,.18)}
+.handle{width:36px;height:4px;background:rgba(255,255,255,.18);border-radius:2px;margin:0 auto 12px}
+.safe-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(22,163,74,.15);border:1px solid rgba(22,163,74,.3);color:#4ADE80;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;margin-bottom:10px}
+.info-row{display:flex;gap:10px}
+.info-badge{flex:1;background:var(--navy-mid);border-radius:12px;padding:10px;text-align:center;border:1px solid rgba(255,255,255,.06)}
+.info-badge .n{font-size:22px;font-weight:700;color:var(--pink);font-family:'DM Sans',sans-serif}
+.info-badge .l{font-size:10px;color:var(--gray-lt);margin-top:2px}
+
+/* ── Screen header ── */
+.scr-hdr{background:var(--navy);padding:16px 18px 14px;flex-shrink:0}
+.scr-hdr h2{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:700;color:#fff}
+.scr-hdr p{font-size:12px;color:var(--pink-s);margin-top:3px}
+
+/* ── Report ── */
+#report-screen{background:var(--off)}
+.rpt-body{padding:16px 16px 90px}
+.sec-lbl{font-size:11px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 9px}
+.type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.type-card{background:#fff;border:2px solid var(--gray-lt);border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.type-card .tc-icon{width:36px;height:36px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center}
+.type-card .tc-name{font-size:11px;color:var(--dark);font-weight:500}
+.type-card.sel{border-color:var(--pink);background:var(--pink-bg)}
+.urg-row{display:flex;gap:8px}
+.urg-btn{flex:1;padding:10px 6px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
+.urg-btn.low{background:rgba(234,179,8,.1);color:var(--amber);border:2px solid rgba(234,179,8,.3)}
+.urg-btn.mid{background:rgba(251,146,60,.1);color:#EA580C;border:2px solid rgba(251,146,60,.3)}
+.urg-btn.high{background:rgba(220,38,38,.1);color:var(--red);border:2px solid rgba(220,38,38,.3)}
+.urg-btn.sel-low{background:rgba(234,179,8,.22);border-color:var(--amber)}
+.urg-btn.sel-mid{background:rgba(251,146,60,.22);border-color:#EA580C}
+.urg-btn.sel-high{background:rgba(220,38,38,.22);border-color:var(--red)}
+.desc-box{width:100%;background:#fff;border:1.5px solid var(--gray-lt);border-radius:12px;padding:11px 13px;font-size:13px;resize:none;min-height:78px;color:var(--dark);transition:border-color .15s}
+.desc-box:focus{border-color:var(--pink)}
+.anon-row{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:13px;border:1px solid var(--gray-lt)}
+.anon-row span{font-size:13px;color:var(--dark);flex:1}
+.toggle{width:42px;height:24px;background:var(--pink);border-radius:12px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s}
+.toggle::after{content:'';position:absolute;left:20px;top:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:left .2s}
+.toggle.off{background:var(--gray-lt)}
+.toggle.off::after{left:3px}
+.loc-box{background:#fff;border:1px solid var(--gray-lt);border-radius:12px;padding:13px;display:flex;align-items:center;gap:10px}
+.loc-box span{font-size:12.5px;color:var(--dark)}
+.submit-btn{width:100%;background:var(--pink);color:#fff;border-radius:14px;padding:15px;font-size:15px;font-weight:700;margin-top:16px;transition:background .15s;font-family:'DM Sans',sans-serif}
+.submit-btn:hover{background:#d94d78}
+.submit-btn:disabled{background:var(--gray-lt);cursor:default}
+
+/* ── Chat ── */
+#chat-screen{background:#EEF2F7;display:flex;flex-direction:column}
+.chat-hdr{background:var(--navy);padding:14px 18px 12px;flex-shrink:0}
+.astra-row{display:flex;align-items:center;gap:12px}
+.astra-av{width:40px;height:40px;background:linear-gradient(135deg,var(--pink),var(--navy-lt));border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.chat-hdr h2{font-family:'DM Sans',sans-serif;font-weight:700;font-size:16px;color:#fff}
+.online-tag{font-size:11px;color:#4ADE80;display:flex;align-items:center;gap:4px;margin-top:2px}
+.online-tag::before{content:'';width:7px;height:7px;background:#4ADE80;border-radius:50%}
+.messages{flex:1;overflow-y:auto;padding:14px 14px 0;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:82%}
+.msg.bot{align-self:flex-start}
+.msg.user{align-self:flex-end}
+.bubble{padding:10px 13px;border-radius:16px;font-size:13.5px;line-height:1.55}
+.msg.bot .bubble{background:#fff;color:var(--dark);border-radius:4px 16px 16px 16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.msg.user .bubble{background:var(--navy);color:#fff;border-radius:16px 4px 16px 16px}
+.msg-time{font-size:10px;color:var(--gray);margin-top:3px;padding:0 4px}
+.msg.user .msg-time{text-align:right}
+.typing{display:flex;gap:5px;align-items:center;padding:10px 14px;background:#fff;border-radius:4px 16px 16px 16px;width:fit-content;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.typing span{width:7px;height:7px;background:var(--pink);border-radius:50%;animation:bounce .9s infinite}
+.typing span:nth-child(2){animation-delay:.18s}
+.typing span:nth-child(3){animation-delay:.36s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-7px)}}
+.chat-input-area{background:#fff;padding:10px 14px;padding-bottom:calc(10px + var(--safe-bot));border-top:1px solid var(--gray-lt);flex-shrink:0}
+.qr-row{display:flex;gap:7px;margin-bottom:9px;overflow-x:auto;scrollbar-width:none}
+.qr-row::-webkit-scrollbar{display:none}
+.qr{flex-shrink:0;background:var(--pink-bg);border:1px solid rgba(232,98,138,.3);color:var(--pink);font-size:12px;padding:6px 13px;border-radius:20px;cursor:pointer;font-weight:500;white-space:nowrap;transition:background .15s,color .15s}
+.qr:hover{background:var(--pink);color:#fff}
+.chat-input-row{display:flex;gap:9px;align-items:flex-end}
+.chat-input{flex:1;background:var(--off);border:1.5px solid var(--gray-lt);border-radius:22px;padding:10px 15px;font-size:13.5px;resize:none;max-height:100px;line-height:1.4;color:var(--dark);transition:border-color .15s}
+.chat-input:focus{border-color:var(--pink)}
+.send-btn{width:40px;height:40px;background:var(--pink);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.send-btn:hover{background:#d94d78}
+.send-btn:disabled{background:var(--gray-lt);cursor:default}
+
+/* ── Profile ── */
+#profile-screen{background:var(--off)}
+.prof-hdr{background:var(--navy);padding:20px 18px 28px;text-align:center}
+.prof-av{width:72px;height:72px;background:linear-gradient(135deg,var(--pink),var(--navy-lt));border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;border:3px solid rgba(255,255,255,.18)}
+.prof-hdr h2{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:700;color:#fff}
+.prof-handle{font-size:12px;color:var(--pink-s);margin-top:4px}
+.verified{display:inline-flex;align-items:center;gap:5px;background:rgba(22,163,74,.2);border:1px solid rgba(22,163,74,.3);color:#4ADE80;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;margin-top:8px}
+.stats-row{display:flex;gap:10px;padding:16px;margin-top:-18px}
+.stat-card{flex:1;background:#fff;border-radius:14px;padding:12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.stat-card .sn{font-size:24px;font-weight:700;color:var(--pink);font-family:'DM Sans',sans-serif}
+.stat-card .sl{font-size:10px;color:var(--gray);margin-top:2px}
+.menu-list{padding:0 16px 90px}
+.menu-item{display:flex;align-items:center;gap:13px;background:#fff;padding:14px;border-radius:13px;margin-bottom:9px;width:100%;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,.05);transition:background .15s}
+.menu-item:hover{background:var(--pink-bg)}
+.menu-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.menu-txt{flex:1}
+.menu-txt .mt{font-size:14px;font-weight:600;color:var(--dark)}
+.menu-txt .ms{font-size:11px;color:var(--gray);margin-top:2px}
+.menu-arr{color:var(--gray-lt);font-size:18px}
+
+/* ── Sub-screens (profile sections) ── */
+.sub-screen{position:fixed;inset:0;background:var(--off);z-index:50;transform:translateX(100%);transition:transform .25s;overflow-y:auto;padding-bottom:40px}
+.sub-screen.open{transform:translateX(0)}
+.sub-hdr{background:var(--navy);padding:calc(var(--safe-top) + 14px) 18px 14px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:1}
+.back-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;color:#fff;flex-shrink:0}
+.sub-hdr h3{font-family:'DM Sans',sans-serif;font-size:17px;font-weight:700;color:#fff}
+.sub-body{padding:16px}
+.setting-card{background:#fff;border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--off)}
+.setting-row:last-child{border-bottom:none}
+.setting-row .sr-label{font-size:14px;color:var(--dark)}
+.setting-row .sr-sub{font-size:11px;color:var(--gray);margin-top:2px}
+.toggle-sm{width:38px;height:22px;background:var(--pink);border-radius:11px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s}
+.toggle-sm::after{content:'';position:absolute;left:18px;top:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left .2s}
+.toggle-sm.off{background:var(--gray-lt)}
+.toggle-sm.off::after{left:3px}
+.badge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px}
+.badge{background:#fff;border-radius:14px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.badge .bi{font-size:28px;margin-bottom:6px}
+.badge .bn{font-size:12px;font-weight:600;color:var(--dark)}
+.badge .bs{font-size:10px;color:var(--gray);margin-top:2px}
+.badge.locked{opacity:.45}
+.hist-item{background:#fff;border-radius:13px;padding:13px 14px;margin-bottom:9px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:flex-start;gap:12px}
+.hist-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.hist-info .ht{font-size:13px;font-weight:600;color:var(--dark)}
+.hist-info .hs{font-size:11px;color:var(--gray);margin-top:2px}
+.contact-edit{display:flex;align-items:center;gap:10px;background:#fff;border-radius:13px;padding:13px 14px;margin-bottom:9px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.contact-edit .ce-av{width:40px;height:40px;background:var(--pink-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:2px solid var(--pink-s)}
+.contact-edit .ce-info{flex:1}
+.contact-edit .ce-name{font-size:14px;font-weight:600;color:var(--dark)}
+.contact-edit .ce-phone{font-size:12px;color:var(--gray);margin-top:2px}
+.ce-edit-btn{font-size:12px;color:var(--pink);font-weight:600;padding:6px 12px;border-radius:20px;border:1px solid rgba(232,98,138,.3);background:var(--pink-bg)}
+.ce-del-btn{font-size:12px;color:var(--red);font-weight:600;padding:6px 10px;border-radius:20px;border:1px solid rgba(220,38,38,.25);background:rgba(220,38,38,.07);margin-left:6px}
+.ce-actions{display:flex;align-items:center;gap:0;flex-shrink:0}
+.add-contact-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--pink-bg);border:2px dashed rgba(232,98,138,.4);border-radius:13px;padding:14px;color:var(--pink);font-size:14px;font-weight:600;margin-top:4px;transition:background .15s}
+.add-contact-btn:hover{background:rgba(232,98,138,.15)}
+.ce-editing input{border-bottom:1.5px solid var(--pink-s) !important}
+.ce-save-btn{font-size:12px;color:var(--green);font-weight:600;padding:6px 10px;border-radius:20px;border:1px solid rgba(22,163,74,.3);background:rgba(22,163,74,.08)}
+
+/* ── Login/Cadastro ── */
+#auth-screen{position:fixed;inset:0;background:var(--navy);z-index:200;display:flex;flex-direction:column;overflow-y:auto;padding:var(--safe-top) 0 var(--safe-bot)}
+.auth-inner{flex:1;display:flex;flex-direction:column;padding:0 24px 32px;min-height:100%}
+.auth-logo{text-align:center;padding:36px 0 28px}
+.auth-logo h1{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:700;color:#fff;margin-top:14px}
+.auth-logo h1 em{color:var(--pink);font-style:normal}
+.auth-logo p{font-size:13px;color:var(--gray-lt);margin-top:6px}
+.auth-tabs{display:flex;background:var(--navy-mid);border-radius:14px;padding:4px;margin-bottom:24px}
+.auth-tab{flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;color:var(--gray-lt);cursor:pointer;text-align:center;transition:background .2s,color .2s}
+.auth-tab.active{background:var(--pink);color:#fff}
+.auth-form{display:flex;flex-direction:column;gap:13px}
+.field-group label{display:block;font-size:12px;font-weight:600;color:var(--gray-lt);margin-bottom:5px;letter-spacing:.3px}
+.field-group input{width:100%;background:var(--navy-mid);border:1.5px solid rgba(255,255,255,.1);border-radius:12px;padding:13px 15px;color:#fff;font-size:14px;transition:border-color .15s}
+.field-group input:focus{border-color:var(--pink)}
+.field-group input::placeholder{color:#4B6889}
+.auth-btn{width:100%;background:var(--pink);color:#fff;border-radius:14px;padding:15px;font-size:15px;font-weight:700;margin-top:4px;transition:background .15s;font-family:'DM Sans',sans-serif}
+.auth-btn:hover{background:#d94d78}
+.auth-divider{text-align:center;color:var(--gray);font-size:12px;margin:4px 0}
+.auth-step{display:none}
+.auth-step.active{display:flex;flex-direction:column;gap:13px}
+.step-indicator{display:flex;gap:6px;justify-content:center;margin-bottom:20px}
+.step-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);transition:background .2s}
+.step-dot.done{background:var(--pink)}
+.contacts-setup h3{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:700;color:#fff;margin-bottom:4px}
+.contacts-setup p{font-size:13px;color:var(--gray-lt);margin-bottom:20px;line-height:1.5}
+.contact-slot{background:var(--navy-mid);border-radius:14px;padding:16px;margin-bottom:12px;border:1.5px solid rgba(255,255,255,.08)}
+.contact-slot label{font-size:11px;font-weight:600;color:var(--pink-s);margin-bottom:8px;display:block;letter-spacing:.3px}
+.contact-slot input{width:100%;background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 13px;color:#fff;font-size:13px;margin-bottom:8px;transition:border-color .15s}
+.contact-slot input:last-child{margin-bottom:0}
+.contact-slot input:focus{border-color:var(--pink)}
+.contact-slot input::placeholder{color:#4B6889}
+.skip-link{text-align:center;color:var(--gray);font-size:13px;cursor:pointer;padding:8px;text-decoration:underline;text-underline-offset:3px}
+.skip-link:hover{color:var(--gray-lt)}
+
+/* ── Modals ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--navy);border-radius:24px 24px 0 0;padding:24px 22px 32px;width:100%;max-width:480px;transform:translateY(40px);transition:transform .25s;border-top:1px solid rgba(232,98,138,.22)}
+.overlay.open .modal{transform:translateY(0)}
+.modal h3{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:700;color:#fff;margin-bottom:6px}
+.modal p{font-size:13px;color:var(--gray-lt);line-height:1.6;margin-bottom:16px}
+.modal-btn{width:100%;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:'DM Sans',sans-serif;transition:opacity .15s}
+.modal-btn:hover{opacity:.88}
+.modal-btn.danger{background:var(--red);color:#fff}
+.modal-btn.cancel{background:var(--navy-mid);color:var(--gray-lt)}
+.modal-btn.success{background:var(--green);color:#fff}
+.sos-icon-wrap{text-align:center;margin-bottom:16px}
+.contact-row{display:flex;gap:10px;margin-bottom:14px}
+.ct-card{flex:1;background:var(--navy-mid);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,.07)}
+.ct-card .cn{font-size:12px;font-weight:600;color:#fff}
+.ct-card .cr{font-size:11px;color:var(--pink-s);margin-top:2px}
+.sos-auth-notice{background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);border-radius:12px;padding:12px;margin-bottom:14px;font-size:12px;color:#FCA5A5;line-height:1.55}
+
+/* ── Toast ── */
+.toast{position:fixed;top:calc(var(--safe-top) + 62px);left:50%;transform:translateX(-50%) translateY(-16px);background:var(--dark);color:#fff;font-size:13px;font-weight:600;padding:11px 20px;border-radius:30px;z-index:300;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.35)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.green{background:var(--green)}
+.toast.red{background:var(--red)}
+
+/* ── SVG icons ── */
+svg.ic{display:block}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TOP BAR -->
+  <div id="topbar">
+    <div class="logo">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+        <path d="M13 2L4 6v7c0 5 4 9.5 9 11 5-1.5 9-6 9-11V6L13 2z" fill="#E8628A" opacity=".2"/>
+        <path d="M13 2L4 6v7c0 5 4 9.5 9 11 5-1.5 9-6 9-11V6L13 2z" stroke="#E8628A" stroke-width="1.5"/>
+        <circle cx="13" cy="12" r="3" fill="#E8628A"/>
+        <path d="M13 15v3" stroke="#E8628A" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span class="logo-text">Mapa <em>Antiassédio</em></span>
+    </div>
+    <button class="sos-btn" onclick="openSOS()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      SOS
+    </button>
+  </div>
+
+  <!-- SCREENS -->
+  <div id="screens">
+
+    <!-- MAP -->
+    <div id="map-screen" class="screen active">
+      <div class="map-wrap">
+        <div class="map-bg" id="mapbg" onmousedown="startDrag(event)" ontouchstart="startDragT(event)">
+          <div class="street h" style="top:22%"></div><div class="street h" style="top:48%"></div><div class="street h" style="top:74%"></div>
+          <div class="street v" style="left:20%"></div><div class="street v" style="left:52%"></div><div class="street v" style="left:78%"></div>
+          <!-- Heats: data-type used by filters -->
+          <div class="heat heat-hi" id="h1" data-type="assedio" style="width:130px;height:130px;top:38%;left:54%"></div>
+          <div class="heat heat-hi" id="h2" data-type="assedio" style="width:90px;height:90px;top:68%;left:22%"></div>
+          <div class="heat heat-md" id="h3" data-type="perseguicao" style="width:100px;height:100px;top:20%;left:35%"></div>
+          <div class="heat heat-md" id="h4" data-type="perseguicao" style="width:80px;height:80px;top:55%;left:75%"></div>
+          <div class="heat heat-lo" id="h5" data-type="iluminacao" style="width:70px;height:70px;top:80%;left:60%"></div>
+          <div class="heat heat-lo" id="h6" data-type="iluminacao" style="width:60px;height:60px;top:10%;left:72%"></div>
+          <div class="heat heat-md" id="h7" data-type="fisico" style="width:85px;height:85px;top:45%;left:40%" style="opacity:0"></div>
+          <div class="pin-you" style="top:48%;left:52%"><div class="pin-you-dot"></div></div>
+        </div>
+        <div class="map-filters">
+          <div class="chip on" data-filter="24h" onclick="toggleFilter(this)">Últimas 24h</div>
+          <div class="chip" data-filter="assedio" onclick="toggleFilter(this)">Assédio verbal</div>
+          <div class="chip" data-filter="perseguicao" onclick="toggleFilter(this)">Perseguição</div>
+          <div class="chip" data-filter="iluminacao" onclick="toggleFilter(this)">Iluminação</div>
+          <div class="chip" data-filter="fisico" onclick="toggleFilter(this)">Físico</div>
+        </div>
+      </div>
+      <div class="map-info">
+        <div class="handle"></div>
+        <div class="safe-tag">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 6v7c0 5 4 9.5 9 11 5-1.5 9-6 9-11V6L13 2z"/></svg>
+          Você está em área segura
+        </div>
+        <div class="info-row">
+          <div class="info-badge"><div class="n" id="cnt-today">3</div><div class="l">Alertas hoje</div></div>
+          <div class="info-badge"><div class="n" id="cnt-month">127</div><div class="l">Este mês</div></div>
+          <div class="info-badge"><div class="n">48</div><div class="l">Áreas mapeadas</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORT -->
+    <div id="report-screen" class="screen">
+      <div class="scr-hdr">
+        <h2>Registrar ocorrência</h2>
+        <p>Seu relato ajuda a proteger outras pessoas</p>
+      </div>
+      <div class="rpt-body">
+        <div class="sec-lbl">O que aconteceu?</div>
+        <div class="type-grid">
+          <div class="type-card" onclick="selType(this,'Assédio verbal')">
+            <div class="tc-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+            <div class="tc-name">Verbal</div>
+          </div>
+          <div class="type-card" onclick="selType(this,'Perseguição')">
+            <div class="tc-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a7 7 0 0113 0"/><path d="M19 11l3 3-3 3"/></svg></div>
+            <div class="tc-name">Perseguição</div>
+          </div>
+          <div class="type-card" onclick="selType(this,'Assédio físico')">
+            <div class="tc-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></div>
+            <div class="tc-name">Físico</div>
+          </div>
+          <div class="type-card" onclick="selType(this,'Imagem não consentida')">
+            <div class="tc-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M1 1l22 22" stroke="#DC2626"/></svg></div>
+            <div class="tc-name">Imagem</div>
+          </div>
+          <div class="type-card" onclick="selType(this,'Iluminação precária')">
+            <div class="tc-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="3"/><path d="M12 6a6 6 0 000 12v3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/></svg></div>
+            <div class="tc-name">Iluminação</div>
+          </div>
+          <div class="type-card" onclick="selType(this,'Outro')">
+            <div class="tc-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round" stroke-width="2"/></svg></div>
+            <div class="tc-name">Outro</div>
+          </div>
+        </div>
+        <div class="sec-lbl">Nível de urgência</div>
+        <div class="urg-row">
+          <button class="urg-btn low" onclick="selUrg(this,'low')">Baixo</button>
+          <button class="urg-btn mid" onclick="selUrg(this,'mid')">Médio</button>
+          <button class="urg-btn high" onclick="selUrg(this,'high')">Alto</button>
+        </div>
+        <div class="sec-lbl">Localização</div>
+        <div class="loc-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="2"><path d="M12 2a7 7 0 017 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 017-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          <span>Barra da Tijuca, Rio de Janeiro — detectada automaticamente</span>
+        </div>
+        <div class="sec-lbl">Descrição (opcional)</div>
+        <textarea class="desc-box" id="desc" placeholder="Descreva o ocorrido em suas palavras..."></textarea>
+        <div class="sec-lbl">Privacidade</div>
+        <div class="anon-row">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          <span>Enviar como denúncia anônima</span>
+          <div class="toggle" id="anonToggle" onclick="this.classList.toggle('off')"></div>
+        </div>
+        <button class="submit-btn" onclick="submitReport()">Publicar alerta agora</button>
+      </div>
+    </div>
+
+    <!-- CHAT / ASTRA -->
+    <div id="chat-screen" class="screen">
+      <div class="chat-hdr">
+        <div class="astra-row">
+          <div class="astra-av">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div>
+            <h2>Astra</h2>
+            <div class="online-tag">Online agora</div>
+          </div>
+        </div>
+      </div>
+      <div class="messages" id="messages">
+        <div class="msg bot">
+          <div class="bubble">Olá! Sou a Astra, sua assistente de segurança. Estou aqui para te apoiar, registrar ocorrências ou responder suas dúvidas. Como posso te ajudar agora?</div>
+          <div class="msg-time">agora</div>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <div class="qr-row" id="quickReplies">
+          <div class="qr" onclick="sendQuick(this)">Fui assediada agora</div>
+          <div class="qr" onclick="sendQuick(this)">Quero registrar uma ocorrência</div>
+          <div class="qr" onclick="sendQuick(this)">Como me proteger?</div>
+          <div class="qr" onclick="sendQuick(this)">Quais são meus direitos?</div>
+        </div>
+        <div class="chat-input-row">
+          <textarea class="chat-input" id="chatInput" rows="1" placeholder="Escreva sua mensagem..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div id="profile-screen" class="screen">
+      <div class="prof-hdr">
+        <div class="prof-av">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0116 0"/></svg>
+        </div>
+        <h2 id="prof-name">Lucas Oliveira</h2>
+        <div class="prof-handle" id="prof-handle">@lucas_seguro</div>
+        <div class="verified">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          Perfil verificado
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="sn">24</div><div class="sl">Alertas feitos</div></div>
+        <div class="stat-card"><div class="sn">15</div><div class="sl">Áreas marcadas</div></div>
+        <div class="stat-card"><div class="sn">4.8</div><div class="sl">Confiança</div></div>
+      </div>
+      <div class="menu-list">
+        <button class="menu-item" onclick="openSub('sub-privacy')">
+          <div class="menu-icon" style="background:#FCE8EF">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <div class="menu-txt"><div class="mt">Privacidade e segurança</div><div class="ms">Gerencie o anonimato e dados</div></div>
+          <div class="menu-arr">›</div>
+        </button>
+        <button class="menu-item" onclick="openSub('sub-history')">
+          <div class="menu-icon" style="background:#EFF6FF">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <div class="menu-txt"><div class="mt">Meus registros e alertas</div><div class="ms">Histórico de denúncias</div></div>
+          <div class="menu-arr">›</div>
+        </button>
+        <button class="menu-item" onclick="openSub('sub-badges')">
+          <div class="menu-icon" style="background:#F0FDF4">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="menu-txt"><div class="mt">Conquistas e selos</div><div class="ms">Metas e gamificação</div></div>
+          <div class="menu-arr">›</div>
+        </button>
+        <button class="menu-item" onclick="openSub('sub-notif')">
+          <div class="menu-icon" style="background:#FFF7ED">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          </div>
+          <div class="menu-txt"><div class="mt">Notificações</div><div class="ms">Alertas próximos a você</div></div>
+          <div class="menu-arr">›</div>
+        </button>
+        <button class="menu-item" onclick="openSub('sub-contacts')">
+          <div class="menu-icon" style="background:#F5F3FF">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          </div>
+          <div class="menu-txt"><div class="mt">Contatos de emergência</div><div class="ms">Gerenciar quem recebe o SOS</div></div>
+          <div class="menu-arr">›</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVBAR -->
+  <nav id="navbar">
+    <button class="nav-item active" onclick="goTo('map-screen',this)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5.4-2.7A1 1 0 013 16.4V5.6a1 1 0 011.4-.9L9 7l6-3 5.4 2.7A1 1 0 0121 7.6v10.8a1 1 0 01-1.4.9L15 17l-6 3z"/><line x1="9" y1="7" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="17"/></svg>
+      Mapa<div class="nav-dot"></div>
+    </button>
+    <button class="nav-item" onclick="goTo('report-screen',this)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Registrar<div class="nav-dot"></div>
+    </button>
+    <button class="nav-item" onclick="goTo('chat-screen',this)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Astra IA<div class="nav-dot"></div>
+    </button>
+    <button class="nav-item" onclick="goTo('profile-screen',this)">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0116 0"/></svg>
+      Perfil<div class="nav-dot"></div>
+    </button>
+  </nav>
+</div>
+
+<!-- ── SUB-SCREENS ── -->
+<!-- Privacy -->
+<div id="sub-privacy" class="sub-screen">
+  <div class="sub-hdr">
+    <button class="back-btn" onclick="closeSub('sub-privacy')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h3>Privacidade e segurança</h3>
+  </div>
+  <div class="sub-body">
+    <div class="setting-card">
+      <div class="setting-row"><div><div class="sr-label">Denúncias anônimas por padrão</div><div class="sr-sub">Oculta seu nome em todos os registros</div></div><div class="toggle-sm" onclick="this.classList.toggle('off')"></div></div>
+      <div class="setting-row"><div><div class="sr-label">Ocultar localização exata</div><div class="sr-sub">Exibe apenas o bairro no mapa</div></div><div class="toggle-sm off" onclick="this.classList.toggle('off')"></div></div>
+      <div class="setting-row"><div><div class="sr-label">Compartilhar dados com autoridades</div><div class="sr-sub">Para fins de segurança pública</div></div><div class="toggle-sm" onclick="this.classList.toggle('off')"></div></div>
+    </div>
+    <div class="setting-card">
+      <div class="setting-row"><div><div class="sr-label">Autenticação em dois fatores</div><div class="sr-sub">Proteja sua conta com código extra</div></div><div class="toggle-sm off" onclick="this.classList.toggle('off')"></div></div>
+      <div class="setting-row"><div><div class="sr-label">Bloquear capturas de tela</div><div class="sr-sub">Impede screenshots do app</div></div><div class="toggle-sm off" onclick="this.classList.toggle('off')"></div></div>
+    </div>
+    <div class="setting-card">
+      <div class="setting-row" onclick="showToast('Dados exportados para o seu e-mail')"><div class="sr-label" style="color:#3B82F6;font-weight:600">Exportar meus dados</div></div>
+      <div class="setting-row" onclick="showToast('Conta excluída (simulação)')"><div class="sr-label" style="color:var(--red);font-weight:600">Excluir minha conta</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- History -->
+<div id="sub-history" class="sub-screen">
+  <div class="sub-hdr">
+    <button class="back-btn" onclick="closeSub('sub-history')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h3>Meus registros</h3>
+  </div>
+  <div class="sub-body">
+    <div class="hist-item"><div class="hist-dot" style="background:var(--red)"></div><div class="hist-info"><div class="ht">Assédio verbal — Metrô Botafogo</div><div class="hs">Hoje, 14:32 · Urgência alta · Anônimo</div></div></div>
+    <div class="hist-item"><div class="hist-dot" style="background:var(--amber)"></div><div class="hist-info"><div class="ht">Iluminação precária — Rua das Flores</div><div class="hs">Ontem, 22:10 · Urgência média · Anônimo</div></div></div>
+    <div class="hist-item"><div class="hist-dot" style="background:var(--amber)"></div><div class="hist-info"><div class="ht">Perseguição — Av. das Américas</div><div class="hs">12/10/2026, 21:45 · Urgência média</div></div></div>
+    <div class="hist-item"><div class="hist-dot" style="background:var(--green)"></div><div class="hist-info"><div class="ht">Assédio verbal — Barra Shopping</div><div class="hs">05/10/2026, 18:20 · Urgência baixa · Anônimo</div></div></div>
+    <div class="hist-item"><div class="hist-dot" style="background:var(--red)"></div><div class="hist-info"><div class="ht">Assédio físico — Ônibus 550</div><div class="hs">28/09/2026, 08:15 · Urgência alta</div></div></div>
+  </div>
+</div>
+
+<!-- Badges -->
+<div id="sub-badges" class="sub-screen">
+  <div class="sub-hdr">
+    <button class="back-btn" onclick="closeSub('sub-badges')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h3>Conquistas</h3>
+  </div>
+  <div class="sub-body">
+    <div class="badge-grid">
+      <div class="badge"><div class="bi"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><path d="M12 2L4 6v7c0 5 4 9.5 9 11 5-1.5 9-6 9-11V6L13 2z"/></svg></div><div class="bn">Guardiã</div><div class="bs">Primeiro alerta</div></div>
+      <div class="badge"><div class="bi"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div><div class="bn">Estrela</div><div class="bs">10 alertas</div></div>
+      <div class="badge"><div class="bi"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div><div class="bn">Coletiva</div><div class="bs">Referência</div></div>
+      <div class="badge locked"><div class="bi"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><div class="bn">Anônima</div><div class="bs">20 anônimos</div></div>
+      <div class="badge locked"><div class="bi"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16" stroke-linecap="round" stroke-width="2"/></svg></div><div class="bn">Pioneira</div><div class="bs">30 dias ativo</div></div>
+      <div class="badge locked"><div class="bi"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="bn">Campeã</div><div class="bs">50 alertas</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Notifications -->
+<div id="sub-notif" class="sub-screen">
+  <div class="sub-hdr">
+    <button class="back-btn" onclick="closeSub('sub-notif')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h3>Notificações</h3>
+  </div>
+  <div class="sub-body">
+    <div class="setting-card">
+      <div class="setting-row"><div><div class="sr-label">Alertas de área de risco</div><div class="sr-sub">Notificar ao entrar em zona perigosa</div></div><div class="toggle-sm" onclick="this.classList.toggle('off')"></div></div>
+      <div class="setting-row"><div><div class="sr-label">Novos registros próximos</div><div class="sr-sub">Raio de 500m da sua localização</div></div><div class="toggle-sm" onclick="this.classList.toggle('off')"></div></div>
+      <div class="setting-row"><div><div class="sr-label">Dicas de segurança</div><div class="sr-sub">Conteúdo semanal educativo</div></div><div class="toggle-sm off" onclick="this.classList.toggle('off')"></div></div>
+      <div class="setting-row"><div><div class="sr-label">Atualizações do app</div><div class="sr-sub">Novas funcionalidades</div></div><div class="toggle-sm off" onclick="this.classList.toggle('off')"></div></div>
+    </div>
+    <div class="setting-card">
+      <div class="setting-row"><div><div class="sr-label">Som de alerta</div><div class="sr-sub">Reproduzir som ao entrar em área de risco</div></div><div class="toggle-sm" onclick="this.classList.toggle('off')"></div></div>
+      <div class="setting-row"><div><div class="sr-label">Vibração</div><div class="sr-sub">Vibrar ao receber alertas</div></div><div class="toggle-sm" onclick="this.classList.toggle('off')"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Contacts -->
+<div id="sub-contacts" class="sub-screen">
+  <div class="sub-hdr">
+    <button class="back-btn" onclick="closeSub('sub-contacts')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <h3>Contatos de emergência</h3>
+  </div>
+  <div class="sub-body">
+    <div id="contacts-list"></div>
+    <button class="add-contact-btn" id="add-contact-btn" onclick="addContact()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Adicionar contato
+    </button>
+  </div>
+</div>
+
+<!-- ── AUTH SCREEN ── -->
+<div id="auth-screen">
+  <div class="auth-inner">
+    <div class="auth-logo">
+      <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+        <path d="M30 5L8 15v17c0 12 9.5 23 22 26 12.5-3 22-14 22-26V15L30 5z" fill="#E8628A" opacity=".18"/>
+        <path d="M30 5L8 15v17c0 12 9.5 23 22 26 12.5-3 22-14 22-26V15L30 5z" stroke="#E8628A" stroke-width="2"/>
+        <circle cx="30" cy="28" r="7" fill="#E8628A"/>
+        <path d="M30 35v8" stroke="#E8628A" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <h1>Mapa <em>Antiassédio</em></h1>
+      <p>Segurança urbana colaborativa</p>
+    </div>
+
+    <!-- Step 1: Login/Cadastro -->
+    <div id="step1" class="auth-step active">
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="switchTab(this,'login')">Entrar</div>
+        <div class="auth-tab" onclick="switchTab(this,'cadastro')">Criar conta</div>
+      </div>
+      <div id="login-form" class="auth-form">
+        <div class="field-group"><label>E-mail</label><input type="email" placeholder="seu@email.com" id="login-email"></div>
+        <div class="field-group"><label>Senha</label><input type="password" placeholder="••••••••" id="login-pass"></div>
+        <button class="auth-btn" onclick="doLogin()">Entrar</button>
+      </div>
+      <div id="cadastro-form" class="auth-form" style="display:none">
+        <div class="field-group"><label>Nome completo</label><input type="text" placeholder="Seu nome" id="reg-name"></div>
+        <div class="field-group"><label>E-mail</label><input type="email" placeholder="seu@email.com" id="reg-email"></div>
+        <div class="field-group"><label>Senha</label><input type="password" placeholder="Mínimo 8 caracteres" id="reg-pass"></div>
+        <div class="field-group"><label>Confirmar senha</label><input type="password" placeholder="Repita a senha" id="reg-pass2"></div>
+        <button class="auth-btn" onclick="doCadastro()">Criar conta</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Contatos de emergência -->
+    <div id="step2" class="auth-step" style="display:none">
+      <div class="step-indicator"><div class="step-dot done"></div><div class="step-dot done"></div></div>
+      <div class="contacts-setup">
+        <h3>Contatos de emergência</h3>
+        <p>Essas pessoas receberão sua localização imediatamente quando você acionar o SOS. Você pode adicionar até 3 contatos.</p>
+      </div>
+      <div class="contact-slot">
+        <label>Contato 1 (obrigatório)</label>
+        <input type="text" placeholder="Nome do contato" id="ct1-name">
+        <input type="tel" placeholder="Telefone com DDD" id="ct1-phone">
+      </div>
+      <div class="contact-slot">
+        <label>Contato 2 (opcional)</label>
+        <input type="text" placeholder="Nome do contato" id="ct2-name">
+        <input type="tel" placeholder="Telefone com DDD" id="ct2-phone">
+      </div>
+      <div class="contact-slot">
+        <label>Contato 3 (opcional)</label>
+        <input type="text" placeholder="Nome do contato" id="ct3-name">
+        <input type="tel" placeholder="Telefone com DDD" id="ct3-phone">
+      </div>
+      <button class="auth-btn" onclick="finishSetup()">Começar a usar</button>
+      <div class="skip-link" onclick="finishSetup()">Pular e adicionar depois</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SOS MODAL ── -->
+<div class="overlay" id="sosOverlay" onclick="closeSOS(event)">
+  <div class="modal">
+    <div class="sos-icon-wrap">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" stroke="#DC2626" stroke-width="2"/><path d="M12 7v5" stroke="#DC2626" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.2" fill="#DC2626"/></svg>
+    </div>
+    <h3>Acionar emergência</h3>
+    <div class="sos-auth-notice">
+      <strong>As seguintes ações serão executadas automaticamente:</strong><br>
+      — Sua localização em tempo real será enviada para seus contatos de emergência<br>
+      — A Polícia Militar e a Central 190 serão acionadas automaticamente<br>
+      — O CISP da sua região receberá um alerta com seus dados de localização
+    </div>
+    <div class="contact-row" id="sos-contacts-row"></div>
+    <p>Deseja confirmar o acionamento de emergência?</p>
+    <button class="modal-btn danger" onclick="triggerSOS()">Confirmar — acionar SOS agora</button>
+    <button class="modal-btn cancel" onclick="closeSOS()">Cancelar</button>
+  </div>
+</div>
+
+<!-- SUCCESS MODAL -->
+<div class="overlay" id="successOverlay" onclick="closeSuccess(event)">
+  <div class="modal">
+    <div class="sos-icon-wrap">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" stroke="#16A34A" stroke-width="2"/><path d="M8 12l3 3 5-5" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h3>Ocorrência registrada</h3>
+    <p>Sua denúncia foi publicada anonimamente. O mapa já foi atualizado e outros usuários próximos foram notificados.</p>
+    <button class="modal-btn success" onclick="closeSuccess()">Ver no mapa</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const STATE = {
+  user: null,
+  contacts: [{name:'',phone:''},{name:'',phone:''},{name:'',phone:''}],
+  filters: { '24h': true, assedio: false, perseguicao: false, iluminacao: false, fisico: false }
+};
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+function switchTab(el, form) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('login-form').style.display   = form==='login'    ? 'flex' : 'none';
+  document.getElementById('cadastro-form').style.display = form==='cadastro' ? 'flex' : 'none';
+}
+
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  if (!email || !pass) { showToast('Preencha e-mail e senha'); return; }
+  // Simulate login
+  const name = email.split('@')[0];
+  STATE.user = { name, email };
+  document.getElementById('prof-name').textContent   = name.charAt(0).toUpperCase() + name.slice(1);
+  document.getElementById('prof-handle').textContent = '@' + name.replace(/\s+/g,'_').toLowerCase();
+  document.getElementById('auth-screen').style.display = 'none';
+  buildContactsList();
+}
+
+function doCadastro() {
+  const name  = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass  = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+  if (!name || !email || !pass) { showToast('Preencha todos os campos'); return; }
+  if (pass !== pass2) { showToast('As senhas não conferem'); return; }
+  if (pass.length < 8) { showToast('Senha mínima: 8 caracteres'); return; }
+  STATE.user = { name, email };
+  document.getElementById('prof-name').textContent   = name;
+  document.getElementById('prof-handle').textContent = '@' + name.replace(/\s+/g,'_').toLowerCase();
+  // Go to step 2
+  document.getElementById('step1').style.display = 'none';
+  document.getElementById('step1').classList.remove('active');
+  document.getElementById('step2').style.display = 'flex';
+  document.getElementById('step2').classList.add('active');
+}
+
+function finishSetup() {
+  // Save contacts
+  const slots = ['ct1','ct2','ct3'];
+  STATE.contacts = slots.map(s => ({
+    name:  document.getElementById(s+'-name')?.value.trim()  || '',
+    phone: document.getElementById(s+'-phone')?.value.trim() || ''
+  }));
+  document.getElementById('auth-screen').style.display = 'none';
+  buildContactsList();
+  buildSOSContacts();
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function goTo(id, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+
+// ── Sub-screens ────────────────────────────────────────────────────────────
+function openSub(id) { document.getElementById(id).classList.add('open'); }
+function closeSub(id) { document.getElementById(id).classList.remove('open'); }
+
+function buildContactsList() {
+  const el = document.getElementById('contacts-list');
+  const avColors = ['#FCE8EF','#EFF6FF','#F0FDF4'];
+  const avSvg = [
+    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8628A" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0116 0"/></svg>`,
+    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0116 0"/></svg>`,
+    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0116 0"/></svg>`,
+  ];
+
+  if (!STATE.contacts.length) {
+    el.innerHTML = `<div style="text-align:center;color:var(--gray);font-size:13px;padding:24px 0">Nenhum contato cadastrado ainda.</div>`;
+    return;
+  }
+
+  el.innerHTML = STATE.contacts.map((c,i) => `
+    <div class="contact-edit" id="ce-row-${i}">
+      <div class="ce-av" style="background:${avColors[i%3]}">${avSvg[i%3]}</div>
+      <div class="ce-info" id="ce-info-${i}">
+        <div style="font-size:14px;font-weight:600;color:var(--dark)">${c.name||'—'}</div>
+        <div style="font-size:12px;color:var(--gray);margin-top:2px">${c.phone||'Sem telefone'}</div>
+      </div>
+      <div class="ce-actions">
+        <button class="ce-edit-btn" onclick="editContact(${i})">Editar</button>
+        <button class="ce-del-btn" onclick="deleteContact(${i})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  // Show/hide add button based on limit
+  const addBtn = document.getElementById('add-contact-btn');
+  if (addBtn) addBtn.style.display = STATE.contacts.length >= 5 ? 'none' : 'flex';
+}
+
+function editContact(i) {
+  const c = STATE.contacts[i];
+  const row = document.getElementById('ce-row-'+i);
+  const info = document.getElementById('ce-info-'+i);
+  // Replace static display with editable inputs
+  info.innerHTML = `
+    <input id="edit-name-${i}" style="border:none;border-bottom:1.5px solid var(--pink-s);font-size:14px;font-weight:600;color:var(--dark);width:100%;outline:none;font-family:Inter,sans-serif;padding:2px 0;background:transparent" value="${c.name}" placeholder="Nome do contato">
+    <input id="edit-phone-${i}" style="border:none;border-bottom:1.5px solid var(--pink-s);font-size:12px;color:var(--gray);width:100%;outline:none;font-family:Inter,sans-serif;padding:2px 0;margin-top:6px;background:transparent" value="${c.phone}" placeholder="Telefone com DDD">
+  `;
+  // Replace buttons
+  const actions = row.querySelector('.ce-actions');
+  actions.innerHTML = `
+    <button class="ce-save-btn" onclick="saveContact(${i})">Salvar</button>
+    <button class="ce-del-btn" onclick="deleteContact(${i})">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+    </button>
+  `;
+}
+
+function saveContact(i) {
+  const name  = document.getElementById('edit-name-'+i)?.value.trim();
+  const phone = document.getElementById('edit-phone-'+i)?.value.trim();
+  if (!name) { showToast('Digite um nome para o contato'); return; }
+  STATE.contacts[i] = { name, phone: phone||'' };
+  buildContactsList();
+  buildSOSContacts();
+  showToast('Contato salvo!', 'green');
+}
+
+function deleteContact(i) {
+  STATE.contacts.splice(i, 1);
+  buildContactsList();
+  buildSOSContacts();
+  showToast('Contato removido');
+}
+
+function addContact() {
+  if (STATE.contacts.length >= 5) { showToast('Máximo de 5 contatos'); return; }
+  STATE.contacts.push({ name:'', phone:'' });
+  buildContactsList();
+  // Open editing mode for the new contact immediately
+  editContact(STATE.contacts.length - 1);
+  // Scroll to bottom
+  setTimeout(() => {
+    const el = document.getElementById('contacts-list');
+    el.scrollIntoView({ behavior:'smooth', block:'end' });
+  }, 50);
+}
+
+function buildSOSContacts() {
+  const row = document.getElementById('sos-contacts-row');
+  const active = STATE.contacts.filter(c => c.name);
+  if (!active.length) { row.innerHTML = ''; return; }
+  row.innerHTML = active.map(c => `
+    <div class="ct-card"><div class="cn">${c.name}</div><div class="cr">${c.phone||'Contato de emergência'}</div></div>
+  `).join('');
+}
+
+// ── Map drag ───────────────────────────────────────────────────────────────
+let drag={active:false,sx:0,sy:0,ox:0,oy:0};
+let mapOffset={x:0,y:0};
+
+function startDrag(e) {
+  drag={active:true,sx:e.clientX,sy:e.clientY,ox:mapOffset.x,oy:mapOffset.y};
+  document.addEventListener('mousemove',onDrag);
+  document.addEventListener('mouseup',endDrag);
+}
+function startDragT(e) {
+  const t=e.touches[0];
+  drag={active:true,sx:t.clientX,sy:t.clientY,ox:mapOffset.x,oy:mapOffset.y};
+  document.addEventListener('touchmove',onDragT,{passive:true});
+  document.addEventListener('touchend',endDrag);
+}
+function onDrag(e) {
+  if(!drag.active) return;
+  mapOffset.x=drag.ox+(e.clientX-drag.sx);
+  mapOffset.y=drag.oy+(e.clientY-drag.sy);
+  applyMapOffset();
+}
+function onDragT(e) {
+  if(!drag.active) return;
+  const t=e.touches[0];
+  mapOffset.x=drag.ox+(t.clientX-drag.sx);
+  mapOffset.y=drag.oy+(t.clientY-drag.sy);
+  applyMapOffset();
+}
+function endDrag() {
+  drag.active=false;
+  document.removeEventListener('mousemove',onDrag);
+  document.removeEventListener('mouseup',endDrag);
+  document.removeEventListener('touchmove',onDragT);
+  document.removeEventListener('touchend',endDrag);
+}
+function applyMapOffset() {
+  document.getElementById('mapbg').style.backgroundPosition=`${mapOffset.x}px ${mapOffset.y}px`;
+  document.querySelectorAll('.heat,.pin-you').forEach(el => {
+    const ox=parseFloat(el.dataset.ox||el.style.left);
+    const oy=parseFloat(el.dataset.oy||el.style.top);
+    if (!el.dataset.ox) { el.dataset.ox=el.style.left; el.dataset.oy=el.style.top; }
+    el.style.left=`calc(${el.dataset.ox} + ${mapOffset.x}px)`;
+    el.style.top=`calc(${el.dataset.oy} + ${mapOffset.y}px)`;
+  });
+}
+
+// ── Map filters ────────────────────────────────────────────────────────────
+const filterCounts = { '24h':3, assedio:5, perseguicao:2, iluminacao:1, fisico:1 };
+
+function toggleFilter(el) {
+  const f = el.dataset.filter;
+  STATE.filters[f] = !STATE.filters[f];
+  el.classList.toggle('on');
+  applyFilters();
+}
+
+function applyFilters() {
+  const anyType = ['assedio','perseguicao','iluminacao','fisico'].some(f=>STATE.filters[f]);
+  document.querySelectorAll('.heat').forEach(h => {
+    const t = h.dataset.type;
+    let show = true;
+    if (anyType) show = STATE.filters[t]||false;
+    if (STATE.filters['24h']) show = show; // 24h shows all that pass type filter
+    h.style.opacity = show ? '1' : '0';
+  });
+  // Update counters
+  let total = 0;
+  ['assedio','perseguicao','iluminacao','fisico'].forEach(f => {
+    if (!anyType || STATE.filters[f]) total += filterCounts[f]||0;
+  });
+  document.getElementById('cnt-today').textContent = anyType ? total : 3;
+  document.getElementById('cnt-month').textContent = anyType ? total*12 : 127;
+}
+
+// ── Report ─────────────────────────────────────────────────────────────────
+function selType(el) {
+  document.querySelectorAll('.type-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function selUrg(el,lvl) {
+  document.querySelectorAll('.urg-btn').forEach(b=>{ b.className=b.className.replace(/\bsel-\w+/,'').trim(); });
+  el.classList.add('sel-'+lvl);
+}
+function submitReport() { document.getElementById('successOverlay').classList.add('open'); }
+function closeSuccess(e) {
+  if(e&&e.target!==document.getElementById('successOverlay')) return;
+  document.getElementById('successOverlay').classList.remove('open');
+  goTo('map-screen',document.querySelectorAll('.nav-item')[0]);
+}
+
+// ── SOS ───────────────────────────────────────────────────────────────────
+function openSOS() { buildSOSContacts(); document.getElementById('sosOverlay').classList.add('open'); }
+function closeSOS(e) {
+  if(e&&e.target!==document.getElementById('sosOverlay')) return;
+  document.getElementById('sosOverlay').classList.remove('open');
+}
+function triggerSOS() {
+  document.getElementById('sosOverlay').classList.remove('open');
+  showToast('SOS enviado! Contatos e autoridades notificados.', 'red');
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function showToast(msg, color='') {
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast'+(color?' '+color:'');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ── Chat / Astra ───────────────────────────────────────────────────────────
+let sample=null;
+let chatHistory=[];
+
+const SYSTEM=`Você é Astra, assistente empática e segura do aplicativo Mapa Antiassédio.
+Você ajuda mulheres que sofreram ou podem sofrer assédio em espaços públicos no Brasil.
+Regras: nunca julgue, seja acolhedora, direta e concisa. Quando alguém relatar um assédio, extraia local, tipo e urgência e ofereça suporte emocional e orientações práticas.
+Resposta máxima: 3 parágrafos curtos. Português brasileiro natural. Sem exagero emocional.`;
+
+(async()=>{ sample=await claude.use('sample'); })();
+
+function nowTime() { return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+
+function addMsg(text,who) {
+  const msgs=document.getElementById('messages');
+  const div=document.createElement('div');
+  div.className='msg '+who;
+  div.innerHTML=`<div class="bubble">${text.replace(/\n/g,'<br>')}</div><div class="msg-time">${nowTime()}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+function showTyping() {
+  const msgs=document.getElementById('messages');
+  const d=document.createElement('div');
+  d.className='msg bot';d.id='typing-ind';
+  d.innerHTML='<div class="typing"><span></span><span></span><span></span></div>';
+  msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
+}
+function removeTyping() { const t=document.getElementById('typing-ind');if(t)t.remove(); }
+
+async function sendMessage() {
+  const input=document.getElementById('chatInput');
+  const text=input.value.trim();
+  if(!text) return;
+  input.value='';input.style.height='';
+  addMsg(text,'user');
+  chatHistory.push({role:'user',content:text});
+  document.getElementById('sendBtn').disabled=true;
+  document.getElementById('quickReplies').style.display='none';
+  showTyping();
+  try {
+    if(!sample){removeTyping();addMsg('Não consegui conectar agora. Tente novamente.','bot');return;}
+    const msgs=[{role:'user',content:SYSTEM+'\n\nHistórico:\n'+chatHistory.slice(0,-1).map(m=>m.role+': '+m.content).join('\n')+'\n\nMensagem: '+text}];
+    const resp=await sample(msgs,{modelTier:'default'});
+    removeTyping();
+    const bot=resp.text.trim();
+    addMsg(bot,'bot');
+    chatHistory.push({role:'assistant',content:bot});
+  } catch(err) {
+    removeTyping();
+    addMsg(err.code==='not_granted'?'Para usar a Astra IA, por favor autorize o acesso e tente novamente.':'Houve um erro. Tente novamente.','bot');
+  } finally { document.getElementById('sendBtn').disabled=false; }
+}
+function sendQuick(el){document.getElementById('chatInput').value=el.textContent;sendMessage();}
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+function autoResize(el){el.style.height='';el.style.height=Math.min(el.scrollHeight,100)+'px';}
+</script>
+</body>
+</html>
